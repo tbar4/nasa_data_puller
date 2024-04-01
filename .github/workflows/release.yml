@@ -5,8 +5,7 @@ permissions:
 
 on:
   push:
-    tags:
-      - dev
+  pull_request:
 
 jobs:
   create-release:
