@@ -6,7 +6,7 @@ use endpoints::{api_key, apod, asteroid_neows_feed};
 mod helpers;
 use helpers::date_helpers::date_builder;
 
-const API_KEY: Option<&str> = Some("9hlwQ6xZEzNnPaIwTmROODd1r1F57D0mkLY5Qar8");
+const API_KEY: Option<&str> = None;
 
 #[tokio::main]
 async fn main() {
