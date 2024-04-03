@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-polars = { version = "0.38.3", features = ["json", "lazy"] }
+chrono = "0.4.37"
+lazy_static = "1.4.0"
+polars = { version = "0.38.3", features = ["json", "lazy", "strings"] }
 reqwest = { version = "0.12.2", features = ["json"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.115"
 tokio = { version = "1.36.0", features = ["macros", "full"] }
+url = "2.5.0"
