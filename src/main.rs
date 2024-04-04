@@ -1,4 +1,4 @@
-use polars::{lazy::dsl::col, prelude::*};
+use std::env;
 
 mod endpoints;
 use endpoints::{api_key, apod, asteroid_neows_feed};
@@ -10,7 +10,7 @@ const API_KEY: Option<&str> = None;
 
 #[tokio::main]
 async fn main() {
-
+    env::set_var("POLARS_FMT_MAX_COLS", "50");
     let api_key = api_key::APIKey::get_api_key(API_KEY);
 
     /* 
