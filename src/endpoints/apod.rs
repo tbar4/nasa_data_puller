@@ -1,10 +1,12 @@
 use serde::{Serialize, Deserialize};
-use polars::prelude::*;
+use polars::{lazy::dsl::StrptimeOptions, prelude::*};
 use std::error::Error;
 use url::Url;
 use std::string::ParseError;
 
-use super::api_key::APIKey;
+use chrono::{DateTime, offset::Utc};
+
+use crate::utils::api_key::APIKey;
 use super::urls::URLS;
 
 
@@ -70,7 +72,21 @@ impl APODRequestQueryString {
         let json = serde_json::to_string(&res).expect("unable to convert struct to string");
         let cursor = std::io::Cursor::new(json);
         let df = JsonReader::new(cursor).finish().unwrap();
+
+        let df_date_correct = df
+            .clone()
+            .lazy()
+            .select([
+                  col("*").exclude(["date"])
+                , col("date").str().to_datetime(
+                    Some(TimeUnit::Milliseconds),
+                    None,
+                    StrptimeOptions::default(),
+                    lit("raise"),
+                )
+            ])
+            .collect()?;
     
-        Ok(df)
+        Ok(df_date_correct)
     }
 }

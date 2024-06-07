@@ -5,9 +5,10 @@ use url::Url;
 use std::string::ParseError;
 use chrono::{self, Datelike};
 
-use crate::helpers::date_helpers::date_builder;
+use crate::utils::date_helpers::date_builder;
+use crate::utils::api_key::APIKey;
 
-use super::{api_key::APIKey, urls::URLS};
+use super::urls::URLS;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AsteroidNeoWSResponse {

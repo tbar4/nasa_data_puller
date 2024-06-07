@@ -1,10 +1,10 @@
 use std::env;
 
 mod endpoints;
-use endpoints::{api_key, apod, asteroid_neows_feed};
+use endpoints::{apod, asteroid_neows_feed};
 
-mod helpers;
-use helpers::date_helpers::date_builder;
+mod utils;
+use utils::{api_key, date_helpers::date_builder};
 
 const API_KEY: Option<&str> = None;
 
@@ -20,7 +20,8 @@ async fn main() {
     }.url_get().await.unwrap();
     */
 
-    let asteroid = asteroid_neows_feed::AsteroidNeoWSRequestQueryString { 
+    //let asteroid = asteroid_neows_feed::AsteroidNeoWSRequestQueryString { 
+    let asteroid = apod::APODRequestQueryString {
         api_key: api_key,
         ..Default::default()
     }
