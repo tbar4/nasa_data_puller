@@ -1,27 +1,46 @@
+use chrono::Datelike;
+
 use serde::{Serialize, Deserialize};
-use polars::prelude::*;
+use serde_json::Value;
+
 use std::{collections::HashMap, error::Error};
+
+use surrealdb::engine::remote::ws::Client;
+use surrealdb::Surreal;
+
 use url::Url;
-use std::string::ParseError;
-use chrono::{self, Datelike};
 
-use crate::utils::date_helpers::date_builder;
 use crate::utils::api_key::APIKey;
-
 use super::urls::URLS;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AsteroidNeoWSResponse {
     pub links: HashMap<String, String>,
     pub element_count: u8,
+    pub near_earth_objects: HashMap<String, Vec<NearEarthObject>>,
+}
+
+impl AsteroidNeoWSResponse {
+    pub async fn sink_to_surreal(self, db: &Surreal<Client>) -> Result<(), Box<dyn Error>> {
+        //let neo = self.near_earth_objects;
+        
+        let _created: Vec<Self> = db
+            .create("asteroid_near_earth_object_web_service")
+            .content(Self {
+                element_count: self.element_count,
+                links: self.links,
+                near_earth_objects: self.near_earth_objects,
+
+            })
+            .await?;
+
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct NearEarthObjects {
     pub near_earth_objects: HashMap<String, Vec<NearEarthObject>>,
-
-    #[serde(flatten)]
-    pub pagination: AsteroidNeoWSResponse,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -106,7 +125,6 @@ pub struct EstFeet {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AsteroidNeoWSRequestQueryString {
     pub url: String,
-    pub api_key: APIKey,
     pub start_date: String,
     pub end_date: String,
 }
@@ -115,7 +133,6 @@ impl Default for AsteroidNeoWSRequestQueryString {
     fn default() -> Self {
         Self { 
             url: URLS["asteroid_neo_ws"].clone(),
-            api_key: APIKey::get_api_key(None), 
             start_date: format!("{}-{}-{}", chrono::Utc::now().year(), chrono::Utc::now().month(), chrono::Utc::now().day()), 
             end_date: format!("{}-{}-{}", chrono::Utc::now().year(), chrono::Utc::now().month(), chrono::Utc::now().day())
         }
@@ -123,62 +140,20 @@ impl Default for AsteroidNeoWSRequestQueryString {
 }
 
 impl AsteroidNeoWSRequestQueryString {
-    pub async fn parse_query_string(&self) -> Result<Url, ParseError> {
-        
+    pub async fn url_get(&self, api_key: &APIKey) -> Result<HashMap<String, Vec<NearEarthObject>>, Box<dyn Error>> { 
         let url = Url::parse_with_params(self.url.as_str(), 
-            &[("api_key", self.api_key.api_key.clone()),
+            &[("api_key", api_key.api_key.clone()),
             ("start_date", self.start_date.clone()),
             ("end_date", self.end_date.clone()),
-        ]).unwrap();
-        Ok(url)
-    }
+        ])?;
 
-    pub async fn url_get(&self) -> Result<DataFrame, Box<dyn Error>> { 
-        let url = self.parse_query_string().await.unwrap();
         let res = reqwest::get(url)
             .await?
-            .json::<NearEarthObjects>()
-            .await?;
-    
-        let json = serde_json::to_string(&res).expect("unable to convert struct to string");
-        let cursor = std::io::Cursor::new(json);
-        let asteroid = JsonReader::new(cursor).finish().unwrap();
+            .json::<AsteroidNeoWSResponse>()
+            .await?
+            .near_earth_objects;
 
-        let df = asteroid
-            .clone()
-            .lazy()
-            .select([
-                col("near_earth_objects")
-            ])
-            .unnest(["near_earth_objects"])
-            .explode([date_builder().as_str()])
-            .unnest([date_builder().as_str()])
-            .explode(["close_approach_data"])
-            .unnest(["estimated_diameter", "close_approach_data"])
-            .unnest(["kilometers", "meters", "miles", "feet"])
-            .unnest(["relative_velocity", "miss_distance"])
-            //.unnest(["meters"])
-            .collect()
-            .unwrap();
-    
-        Ok(df)
+        println!("{:#?}", &res);
+        Ok(res)
     }
 }
-
-/*
-            .select([
-                (col("estimated_diameter_min")).alias("estimated_diameter_min_meters"),
-                (col("estimated_diameter_max")).alias("estimated_diameter_max_meters")
-            ])
-            .unnest(["miles"])
-            .select([
-                (col("estimated_diameter_min")).alias("estimated_diameter_min_miles"),
-                (col("estimated_diameter_max")).alias("estimated_diameter_max_miles")
-            ])
-            .unnest(["feet"])
-            .select([
-                (col("estimated_diameter_min")).alias("estimated_diameter_min_feet"),
-                (col("estimated_diameter_max")).alias("estimated_diameter_max_feet")
-            ])
-
-*/

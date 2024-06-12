@@ -1,14 +1,14 @@
 use serde::{Serialize, Deserialize};
-use polars::{lazy::dsl::StrptimeOptions, prelude::*};
-use std::error::Error;
-use url::Url;
-use std::string::ParseError;
 
-use chrono::{DateTime, offset::Utc};
+use std::error::Error;
+
+use surrealdb::engine::remote::ws::Client;
+use surrealdb::Surreal;
+
+use url::Url;
 
 use crate::utils::api_key::APIKey;
 use super::urls::URLS;
-
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct APODResponse {
@@ -21,47 +21,71 @@ pub struct APODResponse {
     pub url: String,
 }
 
+impl APODResponse {
+    pub async fn sink_to_surreal(self, db: &Surreal<Client>) -> Result<(), Box<dyn Error>> {
+        let _created: Vec<APODResponse> = db
+            .create("astronomy_picture_of_the_day")
+            .content( Self {
+                date: self.date,
+                explanation: self.explanation,
+                hdurl: self.hdurl,
+                media_type: self.media_type,
+                service_version: self.service_version,
+                title: self.title,
+                url: self.url,
+            })
+            .await?;
+
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone,)]
 pub struct APODRequestQueryString {
     pub url: String,
-    pub api_key: APIKey,
+    //pub api_key: APIKey,
     pub date: String,
     pub start_date: String,
     pub end_date: String,
     pub count: String,
     pub thumbs: String,
-    pub response: APODResponse
 }
 
 impl Default for APODRequestQueryString {
     fn default() -> Self {
         Self {
             url: URLS["apod"].clone(),
-            api_key: APIKey::get_api_key(None),
             date: String::from(""),
             start_date: String::from(""),
             end_date: String::from(""),
             count: String::from(""),
             thumbs: String::from(""),
-            response: APODResponse{ ..Default::default() },
         }
     }
 }
 
 impl APODRequestQueryString {
-    pub async fn parse_query_string(&self) -> Result<Url, ParseError> {
+    pub async fn url_get(&self, api_key: &APIKey) -> Result<APODResponse, Box<dyn Error>> {
         let url = Url::parse_with_params(self.url.as_str(), 
-            &[("api_key", self.api_key.api_key.clone()),
+            &[("api_key", api_key.api_key.clone()),
             ("date", self.date.clone()),
             ("start_date", self.start_date.clone()),
             ("end_date", self.end_date.clone()),
             ("count", self.count.clone()),
             ("thumbs", self.thumbs.clone()),
-        ]).unwrap();
-        Ok(url)
+        ])?;
+    
+        let res = reqwest::get(url)
+            .await?
+            .json::<APODResponse>()
+            .await?;
+    
+        Ok(res)
     }
+}
 
-    pub async fn url_get(&self) -> Result<DataFrame, Box<dyn Error>> { 
+/*
+    pub async fn url_get_return_df(&self) -> Result<DataFrame, Box<dyn Error>> { 
         let url = self.parse_query_string().await.unwrap();
     
         let res = reqwest::get(url)
@@ -89,4 +113,4 @@ impl APODRequestQueryString {
     
         Ok(df_date_correct)
     }
-}
+    */
